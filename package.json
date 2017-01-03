@@ -1,0 +1,30 @@
+{
+  "name": "emscripten-console",
+  "version": "1.0.0",
+  "description": "Compiles C/C++ programs into an interactive terminal",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/montaguegabe/emscripten-console.git"
+  },
+  "keywords": [
+    "emscripten",
+    "javascript",
+    "c",
+    "c++"
+  ],
+  "author": "Gabe Montague",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/montaguegabe/emscripten-console/issues"
+  },
+  "homepage": "https://github.com/montaguegabe/emscripten-console#readme",
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-shell": "^2.1.0",
+    "lodash": "^4.17.4"
+  }
+}
