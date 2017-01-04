@@ -18,6 +18,7 @@ function parseConfig(configFile, grunt) {
 
     var executableName = userSettings.executableName || "executable";
     var buildDir = userSettings.buildDir || "build/";
+    var fullOptimize = false;
 
     var emccOptions = userSettings.emccOptions || [];
     var sourceFiles = userSettings.sourceFiles || [];
@@ -30,6 +31,11 @@ function parseConfig(configFile, grunt) {
             return !Array.isArray(object);
         })) {
         grunt.fail.warn("Invalid type for object in source JSON file. Make sure EMCC files and options are specified as arrays.");
+    }
+
+    // Check optimization level - affects console behavior
+    if (_.includes(emccOptions, '-O3')) {
+        fullOptimize = true;
     }
 
     // Provide defaults ENTERPRETIFY options - console requires interpreting of bytecode
@@ -71,13 +77,14 @@ function parseConfig(configFile, grunt) {
 
     // Put it all together into one command
     var aggregateArgs = _.join([accumulatedOptionsStr, preloadFilesStr, embedFilesStr], ' ');
-    var outputFile = path.join(buildDir, executableName) + '.html';
+    var outputFile = path.join(buildDir, executableName + '.html');
     var emccCommand = 'emcc ' + aggregateArgs + ' ' + sourceFilesStr + ' -o ' + outputFile;
 
     result = {
         command: emccCommand,
         buildDir: buildDir,
-        executableName: executableName
+        executableName: executableName,
+        fullOptimize: fullOptimize
     }
 
     return result;

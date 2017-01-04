@@ -9,15 +9,14 @@ $(document).ready(function() {
     var cinIndex = 0;
     var prevNull = false; // Last inputted was null
     var emscriptenModule;
+    var prompt = 'Emscripten:~$ ';
 
     // Accessed by C/C++ code to indicate that the user should input
     window._EmscriptenConsolePaused = false;
     window._EmscriptenConsoleGetInput = function() {
-        console.log('Paused: Waiting for input...');
         cinString = "";
         cinIndex = 0;
     }
-    window._EmscriptenConsoleOptLevel = 3;
 
     function toggleUnderscore() {
         if (underscoreShown) {
@@ -104,7 +103,6 @@ $(document).ready(function() {
             if (isRunning) {
                 // Send existing line to standard in
                 prevNull = false;
-                if (window._EmscriptenConsolePaused) console.log('Unpaused with input: ' + cinString);
                 window._EmscriptenConsolePaused = false;
             } else {
                 // Parse bogus linux into command arguments
@@ -112,15 +110,22 @@ $(document).ready(function() {
                 var programName = args[0];
                 args.shift();
                 emscriptenModule.arguments = args;
-                executeAsm(programName);
+                loadAsm(programName);
             }
+        }
+
+        // If no program is running print the prompt
+        if (!isRunning) {
+            appendToConsole(prompt, false);
+            cinString = "";
+            cinIndex = 0;
         }
     }
 
-    function executeAsm(name) {
+    function loadAsm(name) {
         isRunning = true;
         emscriptenSetStatus('Downloading...');
-        if (window._EmscriptenConsoleOptLevel === undefined || window._EmscriptenConsoleOptLevel != 3) {
+        if (!window._EmscriptenConsoleFullOpt) {
             $.getScript(name + '.js');
         } else {
             (function() {
@@ -143,6 +148,11 @@ $(document).ready(function() {
         
     }
 
+    function terminateAsm() {
+        // TODO: Force exit
+        isRunning = false;
+    }
+
     // Trigger underscore toggling
     window.setInterval(toggleUnderscore, 500);
 
@@ -154,6 +164,15 @@ $(document).ready(function() {
             case 46:
                 backspaceConsole();
                 e.preventDefault();
+                break;
+
+            // Control-C
+            case 67:
+                if (e.ctrlKey) {
+                    appendToConsole('^C', false);
+                    if (isRunning) terminateAsm();
+                    newlineConsole(false);
+                }
                 break;
         }
     });
@@ -170,7 +189,7 @@ $(document).ready(function() {
                 scrollToBottom();
                 break;
         }
-        e.preventDefault();
+        //e.preventDefault();
     });
 
     var lastUpdate = Date.now();
@@ -217,4 +236,6 @@ $(document).ready(function() {
     };
 
     window.Module = emscriptenModule;
+
+    newlineConsole(false);
 });

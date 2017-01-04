@@ -1,20 +1,23 @@
 module.exports = function(grunt) {
 
     var path = require('path');
-    var configParse = require('./configParse')
+    var configParse = require('./configParse');
+    var injectSettings = require('./injectSettings')
 
     // The default config file is in the parent directory
     var configFile = grunt.option('config') || '../Emscripten.config';
     var configRoot = path.dirname(configFile);
 
+    // Get information (most importantly compile command) from the source-specific settings
+    var sourceConfig = configParse.parseConfig(configFile);
+    var buildDir = path.join(configRoot, sourceConfig.buildDir);
+    var compileCommand = sourceConfig.command;
+
     grunt.initConfig({
-        compileCommand: '',
-        buildDir: '',
-        executableName: '',
         shell: {
             build: {
                 cwd: configRoot,
-                command: '<%= compileCommand %>'
+                command: compileCommand
             }
         },
         copy: {
@@ -22,36 +25,42 @@ module.exports = function(grunt) {
                 cwd: 'shell',
                 expand: true,
                 src: ['./*', '!./empty.html'],
-                dest: path.join(configRoot, '<%= buildDir %>'),
+                dest: buildDir,
             }
         },
         clean: {
             options: { force: true },
-            build: { src: path.join(configRoot, '<%= buildDir %>', '<%= executableName %>') + '.html' }
+            build: { src: path.join(buildDir, sourceConfig.executableName + '.html') }
+        },
+        connect: {
+            server: {
+                base: buildDir,
+                port: 3000
+            }
         }
     });
-
-    // Build the shell command and get the output directory location
-    var result = configParse.parseConfig(configFile);
-    grunt.config('compileCommand', result.command);
-    grunt.config('buildDir', result.buildDir);
-    grunt.config('executableName', result.executableName);
 
     // Tasks
     grunt.loadNpmTasks('grunt-shell');
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
+    grunt.loadNpmTasks('grunt-connect');
 
     grunt.registerTask('build', function() {
         grunt.log.writeln('Compiling console page...');
-        grunt.log.writeln(grunt.config('compileCommand'));
+        grunt.log.writeln(compileCommand);
         grunt.task.run('shell:build');
         grunt.task.run('copy:build');
         grunt.task.run('clean:build');
+
+        // Inject settings into JS file
+        settings = { _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize };
+        injectSettings.generateFile(settings, path.join(buildDir, 'inject.js'), grunt);
     });
 
     grunt.registerTask('help', function() {
         grunt.log.writeln('Call \'grunt build\' to build the webpage. Specify a configuration file path with the --config option. By default a config file will be looked for in the parent directory as \'../Emscripten.config\'.');
+        grunt.log.writeln('You can also use \'grunt connect\' to serve the built page.');
     })
 
     grunt.registerTask('default', ['help']);

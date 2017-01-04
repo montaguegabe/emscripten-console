@@ -24,8 +24,10 @@
   "homepage": "https://github.com/montaguegabe/emscripten-console#readme",
   "devDependencies": {
     "grunt": "^1.0.1",
+    "grunt-connect": "^0.2.0",
     "grunt-contrib-clean": "^1.0.0",
     "grunt-contrib-copy": "^1.0.0",
+    "grunt-replace": "^1.0.1",
     "grunt-shell": "^2.1.0",
     "json5": "^0.5.1",
     "lodash": "^4.17.4"
