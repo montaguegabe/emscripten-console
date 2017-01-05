@@ -1,20 +1,26 @@
 'use strict';
 
 $(document).ready(function() {
-    var isRunning = false;
     var consoleElement = $('#console');
     var output = $('.console-line').last();
     var underscoreShown = false;
-    var cinString = "";
+    var cinString = '';
     var cinIndex = 0;
     var prevNull = false; // Last inputted was null
     var emscriptenModule;
     var prompt = 'Emscripten:~$ ';
 
-    // Accessed by C/C++ code to indicate that the user should input
+    var ConsoleStates = {
+        IDLE: 0,
+        RUN: 1,
+        LOAD: 2
+    }
+    window._EmscriptenConsoleState = ConsoleStates.IDLE;
+
+    // Accessed by C/C++ code to indicate that the user should provide input
     window._EmscriptenConsolePaused = false;
     window._EmscriptenConsoleGetInput = function() {
-        cinString = "";
+        cinString = '';
         cinIndex = 0;
     }
 
@@ -78,14 +84,25 @@ $(document).ready(function() {
         }, 0);
     }
 
-    function newlineConsole(toCin) {
+    function callMockSystemCommand(command) {
+
+        // Parse bogus linux into command arguments
+        var args = command.split(' ');
+        var command = args.shift();
+        if (command == 'load') {
+            loadAsm(args[0]);
+        }
+        // emscriptenModule.arguments = args;
+    }
+
+    function newlineConsole(submitInput) {
 
         var quickToggle = underscoreShown;
         if (quickToggle) {
             toggleUnderscore();
         }
 
-        // Append a new line
+        // Append a new line element
         var lineElement = $('<div />', {
             'class': 'console-line'
         });
@@ -98,32 +115,35 @@ $(document).ready(function() {
             toggleUnderscore();
         }
 
-        // If we have specified that the newline should effect the input then we unpause execution.
-        if (toCin) {
-            if (isRunning) {
-                // Send existing line to standard in
-                prevNull = false;
-                window._EmscriptenConsolePaused = false;
-            } else {
-                // Parse bogus linux into command arguments
-                var args = cinString.split(' ');
-                var programName = args[0];
-                args.shift();
-                emscriptenModule.arguments = args;
-                loadAsm(programName);
-            }
-        }
+        if (submitInput) {
+            switch(window._EmscriptenConsoleState) {
+                case ConsoleStates.RUN:
 
-        // If no program is running print the prompt
-        if (!isRunning) {
-            appendToConsole(prompt, false);
-            cinString = "";
-            cinIndex = 0;
+                    // Send existing line to standard in.
+                    prevNull = false;
+                    window._EmscriptenConsolePaused = false;
+                    break;
+
+                case ConsoleStates.IDLE:
+
+                    // Send existing line to our bogus linux system.
+                    callMockSystemCommand(cinString);
+                    cinIndex = 0;
+                    cinString = '';
+                    appendToConsole(prompt, false);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
     function loadAsm(name) {
-        isRunning = true;
+
+        // Reset the active module
+        emscriptenResetModule();
+
+        window._EmscriptenConsoleState = ConsoleStates.LOAD;
         emscriptenSetStatus('Downloading...');
         if (!window._EmscriptenConsoleFullOpt) {
             $.getScript(name + '.js');
@@ -145,12 +165,10 @@ $(document).ready(function() {
             script.src = name + '.js';
             document.body.appendChild(script);
         }
-        
     }
 
     function terminateAsm() {
-        // TODO: Force exit
-        isRunning = false;
+        // Dummy
     }
 
     // Trigger underscore toggling
@@ -170,8 +188,12 @@ $(document).ready(function() {
             case 67:
                 if (e.ctrlKey) {
                     appendToConsole('^C', false);
-                    if (isRunning) terminateAsm();
-                    newlineConsole(false);
+                    if (window._EmscriptenConsoleState == ConsoleStates.RUN) terminateAsm();
+                    window._EmscriptenConsoleState = ConsoleStates.IDLE;
+                    newlineConsole(true);
+
+                    // Don't allow this charater to be passed on.
+                    e.preventDefault();
                 }
                 break;
         }
@@ -221,21 +243,35 @@ $(document).ready(function() {
         }
     }
 
-    // Declare the Emscripten module
+    // Declare the Emscripten module for any curently running task
     emscriptenModule = {
-        preRun: [function() {
+        preInit: [function() {
             FS.init(emscriptenCin, emscriptenCout, emscriptenCout);
+        }],
+        // Called after dependencies are loaded
+        postRun: [function() {
+            
+            // File system is ready
             emscriptenSetStatus('Download complete.');
         }],
+        noInitialRun: true,
         totalDependencies: 0,
+        thisProgram: window._EmscriptenConsoleProgramName,
         monitorRunDependencies: function(left) {
             this.totalDependencies = Math.max(this.totalDependencies, left);
             var depString = 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')';
             emscriptenSetStatus(depString);
         }
     };
+    window._EmscriptenConsoleModule = $.extend(true, {}, emscriptenModule);
 
+    function emscriptenResetModule() {
+        emscriptenModule = $.extend(true, {}, window._EmscriptenConsoleModule);
+        window.Module = emscriptenModule;
+    }
+
+    // Set the initial module
     window.Module = emscriptenModule;
 
-    newlineConsole(false);
+    newlineConsole(true);
 });

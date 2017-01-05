@@ -8,7 +8,11 @@ function generateFile(settings, injectionFile, grunt) {
     var _ = require('lodash');
 
     var definitions = _.reduce(settings, function(result, value, key) {
-        return result + 'window.' + key + '=' + value + ';\n';
+        var valueStr = value;
+        if (typeof value === 'string' || value instanceof String) {
+            valueStr = '\'' + value + '\'';
+        }
+        return result + 'window.' + key + '=' + valueStr + ';\n';
     }, '');
 
     fs.writeFile(injectionFile, definitions, 'utf8', function(err) {

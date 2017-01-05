@@ -54,7 +54,10 @@ module.exports = function(grunt) {
         grunt.task.run('clean:build');
 
         // Inject settings into JS file
-        settings = { _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize };
+        settings = {
+            _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize,
+            _EmscriptenConsoleProgramName: sourceConfig.executableName 
+        };
         injectSettings.generateFile(settings, path.join(buildDir, 'inject.js'), grunt);
     });
 
@@ -63,5 +66,6 @@ module.exports = function(grunt) {
         grunt.log.writeln('You can also use \'grunt connect\' to serve the built page.');
     })
 
+    grunt.registerTask('buildconnect', ['build', 'connect']);
     grunt.registerTask('default', ['help']);
 };

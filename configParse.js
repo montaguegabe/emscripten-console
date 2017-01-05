@@ -44,9 +44,12 @@ function parseConfig(configFile, grunt) {
             var sOptionName = optionString.split(/[\s='"]+/)[1];
             return sOptionName == 'EMTERPRETIFY_WHITELIST' || sOptionName == 'EMTERPRETIFY_BLACKLIST';
         })) {
-        // Provide defualt option of whitelist
-        emccOptions.push("-s EMTERPRETIFY_WHITELIST='[\"_main\"]'");
+        // Provide default option of whitelist
+        emccOptions.push("-s EMTERPRETIFY_WHITELIST='[\"_main\",\"__ZN14adaptedConsole17EmscriptenIStreamrsINSt3__112basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEEERNS2_13basic_istreamIcS5_EERT_\",\"__ZN14adaptedConsole17EmscriptenIStreamrsIjEERNSt3__113basic_istreamIcNS2_11char_traitsIcEEEERT_\",\"__ZN14adaptedConsole17EmscriptenIStreamrsIdEERNSt3__113basic_istreamIcNS2_11char_traitsIcEEEERT_\"]'");
     }
+
+    // Provide forced filesystem flag
+    // emccOptions.push('-s FORCE_FILESYSTEM=1');
 
     // Provide the shell file if not specified
     if (!_.find(emccOptions, function(optionString) {
