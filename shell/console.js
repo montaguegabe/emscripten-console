@@ -12,9 +12,9 @@ $(document).ready(function() {
     var cinIndex = 0;
     var prevNull = false; // Last inputted was null
 
-    // Logical OS
+    // Logical
+    var emscriptenModule;
     var prompt = 'Emscripten:/$ ';
-    var loadName = '';
 
     // The current state of the console
     var ConsoleStates = {
@@ -159,7 +159,8 @@ $(document).ready(function() {
         }
     }
 
-    function loadAsm(name, replaceFileSystem) {
+    var loadName = '';
+    function loadAsm(name) {
 
         window._EmscriptenConsoleState = ConsoleStates.LOAD;
         emscriptenSetStatus('Downloading...');
@@ -178,11 +179,72 @@ $(document).ready(function() {
         }
         $.getScript(name + '.js')
         .done(function(script, textStatus) {
-            window.setTimeout(function() { postLoadComplete(true); }, 10);
+            window.setTimeout(function() { loadAsmJsComplete(true); }, 10);
         })
         .fail(function(jqxhr, settings, exception) {
-            postLoadComplete(false);
+            loadAsmJsComplete(false);
         });
+    }
+
+    // Emscripten module definition
+    var lastUpdate = Date.now();
+    function emscriptenSetStatus(text) {
+        var now = Date.now();
+        if (now - lastUpdate < 1) return;
+        lastUpdate = now;
+        appendToConsole(text, false);
+        newlineConsole(false);
+    }
+
+    function emscriptenCin() {
+        if (prevNull) return '\n'.charCodeAt(0);
+        if (cinIndex < cinString.length) {
+            cinIndex++;
+            return cinString.charCodeAt(cinIndex - 1);
+        } else {
+            prevNull = true;
+            return null;
+        }
+    }
+
+    function emscriptenCout(asciiCode) {
+        if (asciiCode == 10) {
+            newlineConsole(false);
+        } else if (asciiCode != 13) {
+            appendToConsole(String.fromCharCode(asciiCode), false);
+        }
+    }
+
+    // Called when a script has been loaded successfully
+    function loadAsmJsComplete(success) {
+
+        if (!success) {
+            window._EmscriptenConsoleState = ConsoleStates.IDLE;
+            emscriptenSetStatus('Error: Failed to load command ' + loadName + '.');
+            return;
+        }
+
+        // Create the module - use window.Module as a placeholder for it
+        window.Module = window[loadName]({
+            stdin: emscriptenCin,
+            stdout: emscriptenCout,
+            stderr: emscriptenCout,
+            postRun: [loadAsmRuntimeComplete],
+            noInitialRun: true,
+            totalDependencies: 0,
+            thisProgram: window._EmscriptenConsoleProgramName,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                var depString = 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')';
+                emscriptenSetStatus(depString);
+            }
+        });
+        window._EmscriptenConsoleModules[loadName] = window.Module;
+    }
+
+    function loadAsmRuntimeComplete() {
+        window._EmscriptenConsoleState = ConsoleStates.IDLE;
+        emscriptenSetStatus('Successfully loaded module ' + loadName);
     }
 
     function runAsm(programName, args) {
@@ -239,65 +301,6 @@ $(document).ready(function() {
                 break;
         }
     });
-
-    var lastUpdate = Date.now();
-
-    function emscriptenSetStatus(text) {
-        var now = Date.now();
-        if (now - lastUpdate < 1) return;
-        lastUpdate = now;
-        appendToConsole(text, false);
-        newlineConsole(false);
-    }
-
-    function emscriptenCin() {
-        if (prevNull) return '\n'.charCodeAt(0);
-        if (cinIndex < cinString.length) {
-            cinIndex++;
-            return cinString.charCodeAt(cinIndex - 1);
-        } else {
-            prevNull = true;
-            return null;
-        }
-    }
-
-    function emscriptenCout(asciiCode) {
-        if (asciiCode == 10) {
-            newlineConsole(false);
-        } else if (asciiCode != 13) {
-            appendToConsole(String.fromCharCode(asciiCode), false);
-        }
-    }
-
-    // Called when a script has been loaded successfully
-    function postLoadComplete(success) {
-
-        if (!success) {
-            window._EmscriptenConsoleState = ConsoleStates.IDLE;
-            emscriptenSetStatus('Error: Failed to load command ' + loadName + '.');
-            return;
-        }
-
-        // Store the module by its name
-        window._EmscriptenConsoleModules[loadName] = window[loadName]({
-            preRun: [function() {
-                FS.init(emscriptenCin, emscriptenCout, emscriptenCout);
-            }],
-            // Called after dependencies are loaded
-            //postRun: [postLoadComplete],
-            noInitialRun: true,
-            totalDependencies: 0,
-            thisProgram: window._EmscriptenConsoleProgramName,
-            monitorRunDependencies: function(left) {
-                this.totalDependencies = Math.max(this.totalDependencies, left);
-                var depString = 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')';
-                emscriptenSetStatus(depString);
-            }
-        });
-
-        window._EmscriptenConsoleState = ConsoleStates.IDLE;
-        emscriptenSetStatus('Command ' + loadName + ' successfully loaded.');
-    }
 
     newlineConsole(false);
 });

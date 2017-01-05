@@ -51,14 +51,14 @@ function parseConfig(configFile, grunt) {
     // Provide modularization settings
     emccOptions.push('-s EXPORT_NAME=\'"' + executableName + '"\'', '-s MODULARIZE=1', '-s \'EXTRA_EXPORTED_RUNTIME_METHODS=["FS"]\'');
 
-    // Necessary postLoad function to signal loading complete
-    if (!_.find(emccOptions, function(optionString) {
+    // Necessary initialization function to signal loading complete
+    if (_.find(emccOptions, function(optionString) {
             var optionName = optionString.split(' ')[0];
             return optionName == '--post-js';
         })) {
         grunt.fail.warn("You may not specify the --post-js option when using with the console.");
     }
-    emccOptions.push('--post-js postLoad.js');
+    emccOptions.push('--post-js ' + path.join(gruntRoot, 'postLoad.js'));
 
     // Provide the shell file if not specified
     if (!_.find(emccOptions, function(optionString) {
