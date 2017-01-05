@@ -48,8 +48,17 @@ function parseConfig(configFile, grunt) {
         emccOptions.push("-s EMTERPRETIFY_WHITELIST='[\"_main\",\"__ZN14adaptedConsole17EmscriptenIStreamrsINSt3__112basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEEERNS2_13basic_istreamIcS5_EERT_\",\"__ZN14adaptedConsole17EmscriptenIStreamrsIjEERNSt3__113basic_istreamIcNS2_11char_traitsIcEEEERT_\",\"__ZN14adaptedConsole17EmscriptenIStreamrsIdEERNSt3__113basic_istreamIcNS2_11char_traitsIcEEEERT_\"]'");
     }
 
-    // Provide forced filesystem flag
-    // emccOptions.push('-s FORCE_FILESYSTEM=1');
+    // Provide modularization settings
+    emccOptions.push('-s EXPORT_NAME=\'"' + executableName + '"\'', '-s MODULARIZE=1', '-s \'EXTRA_EXPORTED_RUNTIME_METHODS=["FS"]\'');
+
+    // Necessary postLoad function to signal loading complete
+    if (!_.find(emccOptions, function(optionString) {
+            var optionName = optionString.split(' ')[0];
+            return optionName == '--post-js';
+        })) {
+        grunt.fail.warn("You may not specify the --post-js option when using with the console.");
+    }
+    emccOptions.push('--post-js postLoad.js');
 
     // Provide the shell file if not specified
     if (!_.find(emccOptions, function(optionString) {

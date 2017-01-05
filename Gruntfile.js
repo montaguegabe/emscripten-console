@@ -51,7 +51,7 @@ module.exports = function(grunt) {
         grunt.log.writeln(compileCommand);
         grunt.task.run('shell:build');
         grunt.task.run('copy:build');
-        grunt.task.run('clean:build');
+        //grunt.task.run('clean:build');
 
         // Inject settings into JS file
         settings = {
@@ -66,6 +66,7 @@ module.exports = function(grunt) {
         grunt.log.writeln('You can also use \'grunt connect\' to serve the built page.');
     })
 
-    grunt.registerTask('buildconnect', ['build', 'connect']);
+    grunt.registerTask('bc', ['build', 'connect']);
+    grunt.registerTask('cc', ['copy', 'connect']);
     grunt.registerTask('default', ['help']);
 };
