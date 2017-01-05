@@ -55,8 +55,7 @@ module.exports = function(grunt) {
 
         // Inject settings into JS file
         settings = {
-            _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize,
-            _EmscriptenConsoleProgramName: sourceConfig.executableName 
+            _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize
         };
         injectSettings.generateFile(settings, path.join(buildDir, 'inject.js'), grunt);
     });

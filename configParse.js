@@ -49,7 +49,7 @@ function parseConfig(configFile, grunt) {
     }
 
     // Provide modularization settings
-    emccOptions.push('-s EXPORT_NAME=\'"' + executableName + '"\'', '-s MODULARIZE=1', '-s \'EXTRA_EXPORTED_RUNTIME_METHODS=["FS"]\'');
+    emccOptions.push('-s EXPORT_NAME=\'"' + executableName + '"\'', '-s MODULARIZE=1');
 
     // Necessary initialization function to signal loading complete
     if (_.find(emccOptions, function(optionString) {

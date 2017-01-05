@@ -127,14 +127,18 @@ $(document).ready(function() {
 
                     // Send existing line to our bogus linux system.
                     callMockSystemCommand(cinString);
-                    cinIndex = 0;
-                    cinString = '';
                     break;
                 default:
                     break;
             }
-        } else if (window._EmscriptenConsoleState == ConsoleStates.IDLE) {
+        } else if (window._EmscriptenConsoleState === ConsoleStates.IDLE) {
             appendToConsole(prompt, false);
+        }
+
+        // Reset input unless we are running a program
+        if (window._EmscriptenConsoleState !== ConsoleStates.RUN) {
+            cinString = '';
+            cinIndex = 0;
         }
     }
 
@@ -150,7 +154,7 @@ $(document).ready(function() {
         var command = args.shift();
 
         if (command == 'load') {
-            loadAsm(args[0], args[1] == '-r' || args[1] == '--replace-fs');
+            loadAsm(args[0]);
         } else if (command in window._EmscriptenConsoleModules) {
             runAsm(command, args);
         } else {
@@ -159,14 +163,14 @@ $(document).ready(function() {
         }
     }
 
-    var loadName = '';
+    var activeProgram = '';
     function loadAsm(name) {
 
         window._EmscriptenConsoleState = ConsoleStates.LOAD;
         emscriptenSetStatus('Downloading...');
 
         // Reset the active module
-        loadName = name;
+        activeProgram = name;
 
         if (window._EmscriptenConsoleFullOpt) {
             (function() {
@@ -186,7 +190,7 @@ $(document).ready(function() {
         });
     }
 
-    // Emscripten module definition
+    // Functions used in the Emscipten module definition
     var lastUpdate = Date.now();
     function emscriptenSetStatus(text) {
         var now = Date.now();
@@ -220,43 +224,71 @@ $(document).ready(function() {
 
         if (!success) {
             window._EmscriptenConsoleState = ConsoleStates.IDLE;
-            emscriptenSetStatus('Error: Failed to load command ' + loadName + '.');
+            emscriptenSetStatus('Error: Failed to load command ' + activeProgram + '.');
             return;
         }
 
-        // Create the module - use window.Module as a placeholder for it
-        window.Module = window[loadName]({
+        // Create the module
+        window._EmscriptenConsoleModules[activeProgram] = window[activeProgram]({
             stdin: emscriptenCin,
             stdout: emscriptenCout,
             stderr: emscriptenCout,
-            postRun: [loadAsmRuntimeComplete],
+            postRun: [function() {setTimeout(loadAsmRuntimeComplete, 10)}],
             noInitialRun: true,
             totalDependencies: 0,
-            thisProgram: window._EmscriptenConsoleProgramName,
+            thisProgram: '/' + activeProgram,
             monitorRunDependencies: function(left) {
                 this.totalDependencies = Math.max(this.totalDependencies, left);
                 var depString = 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')';
                 emscriptenSetStatus(depString);
             }
         });
-        window._EmscriptenConsoleModules[loadName] = window.Module;
+
     }
 
     function loadAsmRuntimeComplete() {
         window._EmscriptenConsoleState = ConsoleStates.IDLE;
-        emscriptenSetStatus('Successfully loaded module ' + loadName);
+        emscriptenSetStatus('Successfully loaded module ' + activeProgram);
+
+        var readyModule = window._EmscriptenConsoleModules[activeProgram];
+        activeProgram = null;
+    }
+
+    function resetModule(programName) {
+        // Recreate the module
+        window._EmscriptenConsoleModules[activeProgram] = window[activeProgram]({
+            stdin: emscriptenCin,
+            stdout: emscriptenCout,
+            stderr: emscriptenCout,
+            postRun: [function() { console.log('Ready to move on.')}],
+            noInitialRun: true,
+            totalDependencies: 0,
+            thisProgram: '/' + programName,
+        });
     }
 
     function runAsm(programName, args) {
+        activeProgram = programName;
         console.log('Attempting to run program ' + programName + '...');
         window._EmscriptenConsoleState = ConsoleStates.RUN;
-        //emscriptenResetModule();
-        //window.Module = window._EmscriptenConsoleModules[programName];
-        //window.Module._main('/' + programName, args[0]);
+        var activeModule = window._EmscriptenConsoleModules[programName];
+        activeModule.callMain(args);
     }
 
     function terminateAsm() {
-        // Dummy
+        var activeModule = window._EmscriptenConsoleModules[activeProgram];
+
+        // Abort execution
+        try {
+            activeModule.abort(100)
+        } catch(e) {
+            if (e.slice(0,10) != 'abort(100)') {
+                throw e;
+            }
+        }
+        _EmscriptenConsolePaused = false;
+        resetModule(activeProgram);
+        activeProgram = null;
     }
 
     // Trigger underscore toggling
@@ -276,9 +308,10 @@ $(document).ready(function() {
             case 67:
                 if (e.ctrlKey) {
                     appendToConsole('^C', false);
-                    if (window._EmscriptenConsoleState == ConsoleStates.RUN) terminateAsm();
-                    window._EmscriptenConsoleState = ConsoleStates.IDLE;
-                    //emscriptenResetModule();
+                    if (window._EmscriptenConsoleState == ConsoleStates.RUN) {
+                        terminateAsm();
+                        window._EmscriptenConsoleState = ConsoleStates.IDLE;
+                    }
                     newlineConsole(false);
 
                     // Don't allow this charater to be passed on.
