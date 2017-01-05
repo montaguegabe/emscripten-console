@@ -15,7 +15,6 @@ $(document).ready(function() {
     // Logical
     var emscriptenModule;
     var prompt = 'Emscripten:/$ ';
-    var blockFurtherExecution = false;
 
     // The current state of the console
     var ConsoleStates = {
@@ -120,10 +119,8 @@ $(document).ready(function() {
                 case ConsoleStates.RUN:
 
                     // Send existing line to standard in.
-                    if (!blockFurtherExecution) {
-                        prevNull = false;
-                        window._EmscriptenConsolePaused = false;
-                    }
+                    prevNull = false;
+                    window._EmscriptenConsolePaused = false;
                     break;
 
                 case ConsoleStates.IDLE:
@@ -196,9 +193,6 @@ $(document).ready(function() {
     // Functions used in the Emscipten module definition
     var lastUpdate = Date.now();
     function emscriptenSetStatus(text) {
-        var now = Date.now();
-        if (now - lastUpdate < 1) return;
-        lastUpdate = now;
         appendToConsole(text, false);
         newlineConsole(false);
     }
@@ -243,6 +237,9 @@ $(document).ready(function() {
             monitorRunDependencies: function(left) {
                 this.totalDependencies = Math.max(this.totalDependencies, left);
                 var depString = 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')';
+                var now = Date.now();
+                if (now - lastUpdate < 1000) return;
+                lastUpdate = now;
                 emscriptenSetStatus(depString);
             }
         });
@@ -258,14 +255,12 @@ $(document).ready(function() {
     }
 
     function resetModule(programName) {
-        blockFurtherExecution = true;
-
         // Recreate the module
-        window._EmscriptenConsoleModules[activeProgram] = window[activeProgram]({
+        window._EmscriptenConsoleModules[programName] = window[programName]({
             stdin: emscriptenCin,
             stdout: emscriptenCout,
             stderr: emscriptenCout,
-            postRun: [function() { blockFurtherExecution = false; }],
+            postRun: [function() { runAsm(programName); }],
             noInitialRun: true,
             totalDependencies: 0,
             thisProgram: '/' + programName,
@@ -273,10 +268,14 @@ $(document).ready(function() {
     }
 
     function runAsm(programName, args) {
+        var activeModule = window._EmscriptenConsoleModules[programName];
+        if (activeModule === null) {
+            resetModule(programName);
+            return;
+        }
         activeProgram = programName;
         console.log('Attempting to run program ' + programName + '...');
         window._EmscriptenConsoleState = ConsoleStates.RUN;
-        var activeModule = window._EmscriptenConsoleModules[programName];
         activeModule.callMain(args);
     }
 
@@ -292,7 +291,10 @@ $(document).ready(function() {
             }
         }
         _EmscriptenConsolePaused = false;
-        resetModule(activeProgram);
+
+        // Mark program for reload
+        window._EmscriptenConsoleModules[activeProgram] = null;
+
         activeProgram = null;
     }
 
