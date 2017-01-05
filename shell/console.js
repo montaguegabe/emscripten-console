@@ -15,6 +15,7 @@ $(document).ready(function() {
     // Logical
     var emscriptenModule;
     var prompt = 'Emscripten:/$ ';
+    var blockFurtherExecution = false;
 
     // The current state of the console
     var ConsoleStates = {
@@ -119,8 +120,10 @@ $(document).ready(function() {
                 case ConsoleStates.RUN:
 
                     // Send existing line to standard in.
-                    prevNull = false;
-                    window._EmscriptenConsolePaused = false;
+                    if (!blockFurtherExecution) {
+                        prevNull = false;
+                        window._EmscriptenConsolePaused = false;
+                    }
                     break;
 
                 case ConsoleStates.IDLE:
@@ -255,12 +258,14 @@ $(document).ready(function() {
     }
 
     function resetModule(programName) {
+        blockFurtherExecution = true;
+
         // Recreate the module
         window._EmscriptenConsoleModules[activeProgram] = window[activeProgram]({
             stdin: emscriptenCin,
             stdout: emscriptenCout,
             stderr: emscriptenCout,
-            postRun: [function() { console.log('Ready to move on.')}],
+            postRun: [function() { blockFurtherExecution = false; }],
             noInitialRun: true,
             totalDependencies: 0,
             thisProgram: '/' + programName,
