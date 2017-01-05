@@ -325,6 +325,13 @@ $(document).ready(function() {
                     e.preventDefault();
                 }
                 break;
+
+            case 75:
+                if (e.metaKey) {
+                    $('.console-line').remove();
+                    newlineConsole(false);
+                }
+                break;
         }
     });
 
