@@ -16,7 +16,7 @@ $(document).ready(function() {
 
     // Logical
     var emscriptenModule;
-    var prompt = 'Emscripten:/$ ';
+    var prompt = '';
 
     // The current state of the console
     var ConsoleStates = {
@@ -37,8 +37,7 @@ $(document).ready(function() {
     }
 
     function clear() {
-        $('.console-line').remove();
-        newlineConsole(false);
+        $('.console-line:not(:last)').remove();
     }
 
     function toggleUnderscore() {
@@ -177,10 +176,10 @@ $(document).ready(function() {
     }
 
     var activeProgram = '';
-    function loadAsm(name) {
+    function loadAsm(name, callback, quiet) {
 
         window._EmscriptenConsoleState = ConsoleStates.LOAD;
-        emscriptenSetStatus('Downloading...');
+        if (!quiet) emscriptenSetStatus('Downloading...');
 
         // Reset the active module
         activeProgram = name;
@@ -196,10 +195,10 @@ $(document).ready(function() {
         }
         $.getScript(name + '.js')
         .done(function(script, textStatus) {
-            window.setTimeout(function() { loadAsmJsComplete(true); }, 10);
+            window.setTimeout(function() { loadAsmJsComplete(true, callback, quiet); }, 10);
         })
         .fail(function(jqxhr, settings, exception) {
-            loadAsmJsComplete(false);
+            loadAsmJsComplete(false, callback, quiet);
         });
     }
 
@@ -230,11 +229,12 @@ $(document).ready(function() {
     }
 
     // Called when a script has been loaded successfully
-    function loadAsmJsComplete(success) {
+    function loadAsmJsComplete(success, callback, quiet) {
 
         if (!success) {
             window._EmscriptenConsoleState = ConsoleStates.IDLE;
             emscriptenSetStatus('Error: Failed to load command ' + activeProgram + '.');
+            if (callback) callback(false);
             return;
         }
 
@@ -243,7 +243,7 @@ $(document).ready(function() {
             stdin: emscriptenCin,
             stdout: emscriptenCout,
             stderr: emscriptenCout,
-            postRun: [function() {setTimeout(loadAsmRuntimeComplete, 10)}],
+            postRun: [function() {setTimeout(function() { loadAsmRuntimeComplete(callback, quiet); }, 10)}],
             noInitialRun: true,
             totalDependencies: 0,
             thisProgram: '/' + activeProgram,
@@ -253,18 +253,19 @@ $(document).ready(function() {
                 var now = Date.now();
                 if (now - lastUpdate < 1000) return;
                 lastUpdate = now;
-                emscriptenSetStatus(depString);
+                if (!quiet) emscriptenSetStatus(depString);
             }
         });
 
     }
 
-    function loadAsmRuntimeComplete() {
+    function loadAsmRuntimeComplete(callback, quiet) {
         window._EmscriptenConsoleState = ConsoleStates.IDLE;
-        emscriptenSetStatus('Successfully loaded module ' + activeProgram);
+        emscriptenSetStatus(quiet ? activeProgram + ' loaded' : 'Successfully loaded module ' + activeProgram);
 
         var readyModule = window._EmscriptenConsoleModules[activeProgram];
         activeProgram = null;
+        if (callback) callback(true);
     }
 
     function resetModule(programName) {
@@ -412,7 +413,7 @@ $(document).ready(function() {
         }
     });
 
-    // Hack to print
+    // Hack to print welcome
     var promptSave = prompt;
     prompt = '';
     newlineConsole(false);
@@ -424,6 +425,36 @@ $(document).ready(function() {
     appendToConsole('   Up/Down        : Console history', false); newlineConsole(false);
     appendToConsole('   Ctrl-C         : Terminates a command', false); newlineConsole(false);
     appendToConsole('   Cmd-K          : Clear', false); newlineConsole(false);
-    prompt = promptSave;
     newlineConsole(false);
+
+    // Do loads
+    var loads = window._EmscriptenConsoleQueryString['loads'];
+    if (loads) {
+        var loadList = loads.split(',');
+
+        function depLoaded() {
+            loadList.shift();
+            if (loadList.length) {
+                loadAsm(loadList[0], depLoaded, true);
+            } else {
+                loadsComplete();
+            }
+        }
+        loadAsm(loadList[0], depLoaded, true);
+    } else {
+        loadsComplete();
+    }
+
+    // Prompt the command line once loads are complete
+    function loadsComplete() {
+
+        prompt = 'Emscripten:/$ ';
+        appendToConsole(prompt, false);
+
+        // Load prompt from URL
+        var urlCommand = window._EmscriptenConsoleQueryString['command'];
+        if (urlCommand) {
+            appendToConsole(urlCommand, true);
+        }
+    }
 });
