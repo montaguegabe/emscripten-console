@@ -6,6 +6,8 @@ $(document).ready(function() {
     var consoleElement = $('#console');
     var output = $('.console-line').last();
     var underscoreShown = false;
+    var consoleHistory = [];
+    var consoleHistoryIndex = -1;
 
     // Input
     var cinString = '';
@@ -32,6 +34,11 @@ $(document).ready(function() {
     window._EmscriptenConsoleGetInput = function() {
         cinString = '';
         cinIndex = 0;
+    }
+
+    function clear() {
+        $('.console-line').remove();
+        newlineConsole(false);
     }
 
     function toggleUnderscore() {
@@ -96,6 +103,8 @@ $(document).ready(function() {
 
     function newlineConsole(submitInput) {
 
+        consoleHistoryIndex = -1;
+
         var quickToggle = underscoreShown;
         if (quickToggle) {
             toggleUnderscore();
@@ -149,12 +158,16 @@ $(document).ready(function() {
             return;
         }
 
+        consoleHistory.unshift(command);
+
         // Parse bogus linux into command arguments
         var args = command.split(' ');
         var command = args.shift();
 
         if (command == 'load') {
             loadAsm(args[0]);
+        } else if (command == 'clear') {
+            clear();
         } else if (command in window._EmscriptenConsoleModules) {
             runAsm(command, args);
         } else {
@@ -274,6 +287,20 @@ $(document).ready(function() {
             return;
         }
         activeProgram = programName;
+
+        // Mount shared files
+        var FS = activeModule.FS;
+        FS.mkdir('/shared');
+        FS.mount(activeModule.IDBFS, {}, '/shared');
+        FS.syncfs(true, function (err) {
+            if (err) emscriptenSetStatus(err);
+            return;
+        });
+        FS.chdir('/shared');
+
+        console.log(FS.root.contents);
+        console.log(window._EmscriptenConsoleModules[programName].FS.root.contents);
+
         console.log('Attempting to run program ' + programName + '...');
         window._EmscriptenConsoleState = ConsoleStates.RUN;
         activeModule.callMain(args);
@@ -292,9 +319,14 @@ $(document).ready(function() {
         }
         _EmscriptenConsolePaused = false;
 
+        // Save files
+        var FS = activeModule.FS;
+        FS.syncfs(function (err) {
+            if (err) emscriptenSetStatus(err);
+        });
+
         // Mark program for reload
         window._EmscriptenConsoleModules[activeProgram] = null;
-
         activeProgram = null;
     }
 
@@ -326,10 +358,41 @@ $(document).ready(function() {
                 }
                 break;
 
+            // Command-K to clear
             case 75:
                 if (e.metaKey) {
-                    $('.console-line').remove();
-                    newlineConsole(false);
+                    clear();
+                    e.preventDefault();
+                }
+                break;
+
+            // Up key
+            case 38:
+                if (_EmscriptenConsoleState == ConsoleStates.IDLE) {
+                    if (!consoleHistory.length) break;
+                    consoleHistoryIndex += 1;
+                    if (consoleHistoryIndex >= consoleHistory.length) {
+                        consoleHistoryIndex = consoleHistory.length - 1;
+                    }
+                    cinString = consoleHistory[consoleHistoryIndex];
+                    cinIndex = 0;
+                    modifyConsoleString(function(str) { return prompt + cinString; });
+                    e.preventDefault();
+                }
+                break;
+
+            // Down key
+            case 40:
+                if (_EmscriptenConsoleState == ConsoleStates.IDLE) {
+                    if (!consoleHistory.length) break;
+                    consoleHistoryIndex -= 1;
+                    if (consoleHistoryIndex < 0) {
+                        consoleHistoryIndex = 0;
+                    }
+                    cinString = consoleHistory[consoleHistoryIndex];
+                    cinIndex = 0;
+                    modifyConsoleString(function(str) { return prompt + cinString; });
+                    e.preventDefault();
                 }
                 break;
         }
@@ -349,5 +412,18 @@ $(document).ready(function() {
         }
     });
 
+    // Hack to print
+    var promptSave = prompt;
+    prompt = '';
+    newlineConsole(false);
+    appendToConsole('Emscripten Console ' + window._EmscriptenConsoleVersion, false); newlineConsole(false);
+    appendToConsole('Commands:', false); newlineConsole(false);
+    appendToConsole('   load <command> : Loads a command (emscripten JS file) from the build directory.', false); newlineConsole(false);
+    appendToConsole('   <command>      : Runs a loaded command.', false); newlineConsole(false);
+    appendToConsole('Controls:', false); newlineConsole(false);
+    appendToConsole('   Up/Down        : Console history', false); newlineConsole(false);
+    appendToConsole('   Ctrl-C         : Terminates a command', false); newlineConsole(false);
+    appendToConsole('   Cmd-K          : Clear', false); newlineConsole(false);
+    prompt = promptSave;
     newlineConsole(false);
 });

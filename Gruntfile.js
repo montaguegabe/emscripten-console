@@ -2,6 +2,7 @@ module.exports = function(grunt) {
 
     var path = require('path');
     var configParse = require('./configParse');
+    var package = grunt.file.readJSON("package.json");
     var injectSettings = require('./injectSettings')
 
     // The default config file is in the parent directory
@@ -51,11 +52,12 @@ module.exports = function(grunt) {
         grunt.log.writeln(compileCommand);
         grunt.task.run('shell:build');
         grunt.task.run('copy:build');
-        //grunt.task.run('clean:build');
+        grunt.task.run('clean:build');
 
         // Inject settings into JS file
         settings = {
-            _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize
+            _EmscriptenConsoleFullOpt: sourceConfig.fullOptimize,
+            _EmscriptenConsoleVersion: package.version
         };
         injectSettings.generateFile(settings, path.join(buildDir, 'inject.js'), grunt);
     });
