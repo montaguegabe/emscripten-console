@@ -1,5 +1,8 @@
 'use strict';
 
+// This is a monster of a file implementing all the Emscripten interfacing.
+// TODO: Modularize b/w frontend backend.
+
 $(document).ready(function() {
 
     // Front end
@@ -268,13 +271,13 @@ $(document).ready(function() {
         if (callback) callback(true);
     }
 
-    function resetModule(programName) {
+    function resetModule(programName, args) {
         // Recreate the module
         window._EmscriptenConsoleModules[programName] = window[programName]({
             stdin: emscriptenCin,
             stdout: emscriptenCout,
             stderr: emscriptenCout,
-            postRun: [function() { runAsm(programName); }],
+            postRun: [function() { runAsm(programName, args); }],
             noInitialRun: true,
             totalDependencies: 0,
             thisProgram: '/' + programName,
@@ -284,7 +287,7 @@ $(document).ready(function() {
     function runAsm(programName, args) {
         var activeModule = window._EmscriptenConsoleModules[programName];
         if (activeModule === null) {
-            resetModule(programName);
+            resetModule(programName, args);
             return;
         }
         activeProgram = programName;

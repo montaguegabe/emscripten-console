@@ -4,7 +4,7 @@
 var gruntRoot = __dirname;
 
 // Returns the compiling command line string resulting from the configuration file
-function parseConfig(configFile, grunt) {
+function parseConfig(configFile, target, grunt) {
 
     // Parse file to relaxed JSON
     var fs = require('fs');
@@ -14,7 +14,18 @@ function parseConfig(configFile, grunt) {
 
     // Read content from JSON
     var content = fs.readFileSync(configFile);
-    var userSettings = JSON5.parse(content);
+    var allUserSettings = JSON5.parse(content);
+
+    targets = _.keys(allUserSettings);
+    if (!targets) {
+        grunt.fail.warn("Error parsing config file: no targets found!");
+    }
+    if (target === null) target = targets[0];
+
+    if (!_.has(allUserSettings, target)) {
+        grunt.fail.warn("Invalid target name: " + target);
+    }
+    var userSettings = allUserSettings[target];
 
     var executableName = userSettings.executableName || "executable";
     var buildDir = userSettings.buildDir || "build/";

@@ -7,10 +7,11 @@ module.exports = function(grunt) {
 
     // The default config file is in the parent directory
     var configFile = grunt.option('config') || '../Emscripten.config';
+    var configTarget = grunt.option('target') || null;
     var configRoot = path.dirname(configFile);
 
     // Get information (most importantly compile command) from the source-specific settings
-    var sourceConfig = configParse.parseConfig(configFile, grunt);
+    var sourceConfig = configParse.parseConfig(configFile, configTarget, grunt);
     var buildDir = path.join(configRoot, sourceConfig.buildDir);
     var compileCommand = sourceConfig.command;
 
