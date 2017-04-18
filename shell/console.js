@@ -1,7 +1,7 @@
 'use strict';
 
 // This is a monster of a file implementing all the Emscripten interfacing.
-// TODO: Modularize b/w frontend backend.
+// TODO: Modularize the code between frontend and backend.
 
 $(document).ready(function() {
 
@@ -25,7 +25,7 @@ $(document).ready(function() {
     var ConsoleStates = {
         IDLE: 0,
         RUN: 1,
-        LOAD: 2
+        SYSCOMMAND: 2
     }
     window._EmscriptenConsoleState = ConsoleStates.IDLE;
 
@@ -170,6 +170,43 @@ $(document).ready(function() {
             loadAsm(args[0]);
         } else if (command == 'clear') {
             clear();
+        } else if (command == 'ls') {
+
+            var modules = window._EmscriptenConsoleModules;
+
+            // This should really be implemented in C++
+
+            if (args.count > 2) {
+                emscriptenSetStatus('Error: Too many arguments.');
+                return;
+            }
+
+            if (!Object.keys(modules).length) {
+                emscriptenSetStatus('You must first load a module before accessing the file system.');
+                return;
+            }
+            var fsModuleName = lastProgramRun || Object.keys(modules)[0];
+            var fsModule = modules[fsModuleName];
+
+            if (args.count == 2) {
+                if (args[1] in modules) {
+                    fsModule = modules[args[1]];
+                } else {
+                    emscriptenSetStatus('Error: Unknown module ' + args[1]);
+                    return;
+                }
+            }
+
+            // 
+            var path = args[0] || fsModule.FS.cwd();
+            var node = fsModule.FS.findObject(path);
+            if (!node) {
+                emscriptenSetStatus('Cannot find directory ' + path);
+                return;
+            }
+            var contents = Object.keys(node.contents);
+            emscriptenSetStatus(contents.join(' '));
+
         } else if (command in window._EmscriptenConsoleModules) {
             runAsm(command, args);
         } else {
@@ -178,10 +215,11 @@ $(document).ready(function() {
         }
     }
 
-    var activeProgram = '';
+    var activeProgram = null;
+    var lastProgramRun = null;
     function loadAsm(name, callback, quiet) {
 
-        window._EmscriptenConsoleState = ConsoleStates.LOAD;
+        window._EmscriptenConsoleState = ConsoleStates.SYSCOMMAND;
         if (!quiet) emscriptenSetStatus('Downloading...');
 
         // Reset the active module
@@ -331,6 +369,7 @@ $(document).ready(function() {
 
         // Mark program for reload
         window._EmscriptenConsoleModules[activeProgram] = null;
+        lastProgramRun = activeProgram;
         activeProgram = null;
     }
 
