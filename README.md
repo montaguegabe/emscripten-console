@@ -1,7 +1,9 @@
 # emscripten-console
 Use Grunt to compile command-line C++ projects into a web-page-embedded console.
 
-For an example of how to use in a project see [github.com/montaguegabe/matrix-row-reducer](https://github.com/montaguegabe/matrix-row-reducer).
+To see it in action: http://gabemontague.com/matrix-row-reducer/index.html?command=rowreduce&loads=rowreduce%2Cmatrixmake
+
+For further documentation and an example of how to use in a project see [github.com/montaguegabe/matrix-row-reducer](https://github.com/montaguegabe/matrix-row-reducer).
 
 In general the workflow is:
 1) Install [Emscripten](https://github.com/kripken/emscripten)
